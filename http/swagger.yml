@@ -4689,8 +4689,7 @@ components:
         - query
       properties:
         extern:
-          description: external preprocessing options
-          type: object
+          $ref: "#/components/schemas/FileASTNode"
         query:
           description: query script to execute.
           type: string
@@ -4714,6 +4713,28 @@ components:
           type: string
         dialect:
           $ref: "#/components/schemas/Dialect"
+    FileASTNode:
+      description: flux File AST node
+      type: object
+      properties:
+        type:
+          description: type of AST node
+          type: string
+          enum:
+            - File
+        package:
+          description: package declaration
+          type: object
+        imports:
+          description: import declarations
+          type: array
+          items:
+            type: object
+        body:
+          description: preprocessing statements
+          type: array
+          items:
+            type: object
     QuerySpecification:
       description: consists of a set of operations and a set of edges between those operations to instruct the query engine to operate.
       type: object
