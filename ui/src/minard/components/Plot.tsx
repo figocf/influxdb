@@ -10,7 +10,11 @@ import {
   setControlledXDomain,
   setControlledYDomain,
 } from 'src/minard/utils/plotEnvActions'
-import {plotEnvReducer, INITIAL_PLOT_ENV} from 'src/minard/utils/plotEnvReducer'
+import {
+  plotEnvReducer,
+  resetEnv,
+  INITIAL_PLOT_ENV,
+} from 'src/minard/utils/plotEnvReducer'
 
 export interface Props {
   //
@@ -56,14 +60,18 @@ export const Plot: SFC<Props> = ({
   xDomain = null,
   yDomain = null,
 }) => {
-  const [env, dispatch] = useReducer(plotEnvReducer, {
-    ...INITIAL_PLOT_ENV,
-    width,
-    height,
-    xDomain,
-    yDomain,
-    baseLayer: {...INITIAL_PLOT_ENV.baseLayer, table},
-  })
+  const [env, dispatch] = useReducer(
+    plotEnvReducer,
+    {
+      ...INITIAL_PLOT_ENV,
+      width,
+      height,
+      xDomain,
+      yDomain,
+      baseLayer: {...INITIAL_PLOT_ENV.baseLayer, table},
+    }
+    // resetEnv
+  )
 
   useMountedEffect(() => dispatch(setTable(table)), [table])
   useMountedEffect(() => dispatch(setControlledXDomain(xDomain)), [xDomain])
@@ -85,6 +93,10 @@ export const Plot: SFC<Props> = ({
     }),
     [env, hoverX, hoverY, dispatch]
   )
+
+  if (width === 0 || height === 0) {
+    return null
+  }
 
   const plotStyle: CSSProperties = {
     position: 'relative',

@@ -16,6 +16,9 @@ import {
 import {PlotAction} from 'src/minard/utils/plotEnvActions'
 import {getGroupKey} from 'src/minard/utils/getGroupKey'
 
+const DEFAULT_X_DOMAIN: [number, number] = [0, 1]
+const DEFAULT_Y_DOMAIN: [number, number] = [0, 1]
+
 export const INITIAL_PLOT_ENV: PlotEnv = {
   width: 0,
   height: 0,
@@ -35,15 +38,14 @@ export const INITIAL_PLOT_ENV: PlotEnv = {
     table: {columns: {}, columnTypes: {}},
     aesthetics: {},
     scales: {},
+    xDomain: DEFAULT_X_DOMAIN,
+    yDomain: DEFAULT_Y_DOMAIN,
   },
   layers: {},
   hoverX: null,
   hoverY: null,
   dispatch: () => {},
 }
-
-const DEFAULT_X_DOMAIN: [number, number] = [0, 1]
-const DEFAULT_Y_DOMAIN: [number, number] = [0, 1]
 
 export const plotEnvReducer = (state: PlotEnv, action: PlotAction): PlotEnv =>
   produce(state, draftState => {
@@ -273,7 +275,7 @@ const getColorScale = (
   represent all possible groupings of data in the layer.
 */
 const getFillDomain = ({table, aesthetics}: Layer): string[] => {
-  const fillColKeys = aesthetics.fill
+  const fillColKeys = aesthetics.fill as string[]
 
   if (!fillColKeys.length) {
     return []
@@ -289,6 +291,8 @@ const getFillDomain = ({table, aesthetics}: Layer): string[] => {
   return [...fillDomain].sort()
 }
 
+const isArray = (x: any): boolean => x.constructor === Array
+
 /*
   For each layer, compute and set a fill scale according to the layer's
   data-to-fill mapping.
@@ -299,9 +303,29 @@ const setFillScales = (draftState: PlotEnv) => {
   layers
     .filter(
       // Pick out the layers that actually need a fill scale
-      layer => layer.aesthetics.fill && layer.colors && layer.colors.length
+      layer => layer.aesthetics.fill
     )
     .forEach(layer => {
-      layer.scales.fill = getColorScale(getFillDomain(layer), layer.colors)
+      const fill = layer.aesthetics.fill
+
+      let domain
+      let colorScheme
+
+      if (isArray(fill)) {
+        domain = getFillDomain(layer)
+        colorScheme = layer.colors
+      } else {
+        domain = extent(layer.table.columns[layer.aesthetics.fill as string])
+        colorScheme = ['blue', 'red'] // TODO
+      }
+
+      layer.scales.fill = getColorScale(domain, colorScheme)
     })
 }
+
+export const resetEnv = (state: PlotEnv) =>
+  produce(state, draftState => {
+    setXDomain(draftState)
+    setYDomain(draftState)
+    setLayout(draftState)
+  })
