@@ -690,6 +690,29 @@ func (h *TaskHandler) handleGetLogs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	auth, err := pcontext.GetAuthorizer(ctx)
+	if err != nil {
+		err = &platform.Error{
+			Err:  err,
+			Code: platform.EUnauthorized,
+			Msg:  "failed to get authorizer",
+		}
+		EncodeError(ctx, err, w)
+		return
+	}
+
+	if k := auth.Kind(); k != platform.AuthorizationKind {
+		// Get the authorization for the task, if allowed.
+		authz, err := h.getAuthorizationForTask(ctx, req.filter.Task)
+		if err != nil {
+			EncodeError(ctx, err, w)
+			return
+		}
+
+		// We were able to access the authorizer for the task, so reassign that on the context for the rest of this call.
+		ctx = pcontext.SetAuthorizer(ctx, authz)
+	}
+
 	logs, _, err := h.TaskService.FindLogs(ctx, req.filter)
 	if err != nil {
 		err := &platform.Error{
@@ -753,6 +776,29 @@ func (h *TaskHandler) handleGetRuns(w http.ResponseWriter, r *http.Request) {
 		}
 		EncodeError(ctx, err, w)
 		return
+	}
+
+	auth, err := pcontext.GetAuthorizer(ctx)
+	if err != nil {
+		err = &platform.Error{
+			Err:  err,
+			Code: platform.EUnauthorized,
+			Msg:  "failed to get authorizer",
+		}
+		EncodeError(ctx, err, w)
+		return
+	}
+
+	if k := auth.Kind(); k != platform.AuthorizationKind {
+		// Get the authorization for the task, if allowed.
+		authz, err := h.getAuthorizationForTask(ctx, req.filter.Task)
+		if err != nil {
+			EncodeError(ctx, err, w)
+			return
+		}
+
+		// We were able to access the authorizer for the task, so reassign that on the context for the rest of this call.
+		ctx = pcontext.SetAuthorizer(ctx, authz)
 	}
 
 	runs, _, err := h.TaskService.FindRuns(ctx, req.filter)
@@ -939,6 +985,29 @@ func (h *TaskHandler) handleGetRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	auth, err := pcontext.GetAuthorizer(ctx)
+	if err != nil {
+		err = &platform.Error{
+			Err:  err,
+			Code: platform.EUnauthorized,
+			Msg:  "failed to get authorizer",
+		}
+		EncodeError(ctx, err, w)
+		return
+	}
+
+	if k := auth.Kind(); k != platform.AuthorizationKind {
+		// Get the authorization for the task, if allowed.
+		authz, err := h.getAuthorizationForTask(ctx, req.TaskID)
+		if err != nil {
+			EncodeError(ctx, err, w)
+			return
+		}
+
+		// We were able to access the authorizer for the task, so reassign that on the context for the rest of this call.
+		ctx = pcontext.SetAuthorizer(ctx, authz)
+	}
+
 	run, err := h.TaskService.FindRunByID(ctx, req.TaskID, req.RunID)
 	if err != nil {
 		err := &platform.Error{
@@ -1073,6 +1142,29 @@ func (h *TaskHandler) handleRetryRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	auth, err := pcontext.GetAuthorizer(ctx)
+	if err != nil {
+		err = &platform.Error{
+			Err:  err,
+			Code: platform.EUnauthorized,
+			Msg:  "failed to get authorizer",
+		}
+		EncodeError(ctx, err, w)
+		return
+	}
+
+	if k := auth.Kind(); k != platform.AuthorizationKind {
+		// Get the authorization for the task, if allowed.
+		authz, err := h.getAuthorizationForTask(ctx, req.TaskID)
+		if err != nil {
+			EncodeError(ctx, err, w)
+			return
+		}
+
+		// We were able to access the authorizer for the task, so reassign that on the context for the rest of this call.
+		ctx = pcontext.SetAuthorizer(ctx, authz)
+	}
+
 	run, err := h.TaskService.RetryRun(ctx, req.TaskID, req.RunID)
 	if err != nil {
 		err := &platform.Error{
@@ -1124,6 +1216,35 @@ func decodeRetryRunRequest(ctx context.Context, r *http.Request) (*retryRunReque
 		RunID:  ri,
 		TaskID: ti,
 	}, nil
+}
+
+// getAuthorizationForTask looks up the authorization associated with taskID,
+// ensuring that the authorizer on ctx is allowed to view the task and the authorization.
+//
+// This method returns a *platform.Error, suitable for directly passing to EncodeError.
+func (h *TaskHandler) getAuthorizationForTask(ctx context.Context, taskID platform.ID) (*platform.Authorization, *platform.Error) {
+	// First look up the task, if we're allowed.
+	// This assumes h.TaskService validates access.
+	t, err := h.TaskService.FindTaskByID(ctx, taskID)
+	if err != nil {
+		return nil, &platform.Error{
+			Err:  err,
+			Code: platform.EUnauthorized,
+			Msg:  "task ID unknown or unauthorized",
+		}
+	}
+
+	// Explicitly check against an authorized authorization service.
+	authz, err := authorizer.NewAuthorizationService(h.AuthorizationService).FindAuthorizationByID(ctx, t.AuthorizationID)
+	if err != nil {
+		return nil, &platform.Error{
+			Err:  err,
+			Code: platform.EUnauthorized,
+			Msg:  "unable to access task authorization",
+		}
+	}
+
+	return authz, nil
 }
 
 // TaskService connects to Influx via HTTP using tokens to manage tasks.
