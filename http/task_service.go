@@ -258,7 +258,7 @@ func newRunsResponse(rs []*platform.Run, taskID platform.ID) runsResponse {
 func (h *TaskHandler) handleGetTasks(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	req, err := decodeGetTasksRequest(ctx, r)
+	req, err := decodeGetTasksRequest(ctx, r, h.OrganizationService)
 	if err != nil {
 		err = &platform.Error{
 			Err:  err,
@@ -322,7 +322,7 @@ type getTasksRequest struct {
 	filter platform.TaskFilter
 }
 
-func decodeGetTasksRequest(ctx context.Context, r *http.Request) (*getTasksRequest, error) {
+func decodeGetTasksRequest(ctx context.Context, r *http.Request, orgs platform.OrganizationService) (*getTasksRequest, error) {
 	qp := r.URL.Query()
 	req := &getTasksRequest{}
 
@@ -334,12 +334,18 @@ func decodeGetTasksRequest(ctx context.Context, r *http.Request) (*getTasksReque
 		req.filter.After = id
 	}
 
-	if orgID := qp.Get("organization"); orgID != "" {
-		id, err := platform.IDFromString(orgID)
+	if orgName := qp.Get("org"); orgName != "" {
+		o, err := orgs.FindOrganization(ctx, platform.OrganizationFilter{Name: &orgName})
 		if err != nil {
 			return nil, err
 		}
-		req.filter.Organization = id
+		req.filter.Organization = &o.ID
+	} else if oid := qp.Get("orgID"); oid != "" {
+		orgID, err := platform.IDFromString(oid)
+		if err != nil {
+			return nil, err
+		}
+		req.filter.Organization = orgID
 	}
 
 	if userID := qp.Get("user"); userID != "" {
@@ -1184,7 +1190,7 @@ func (t TaskService) FindTasks(ctx context.Context, filter platform.TaskFilter) 
 		val.Add("after", filter.After.String())
 	}
 	if filter.Organization != nil {
-		val.Add("organization", filter.Organization.String())
+		val.Add("orgID", filter.Organization.String())
 	}
 	if filter.User != nil {
 		val.Add("user", filter.User.String())
