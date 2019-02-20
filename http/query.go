@@ -18,7 +18,7 @@ import (
 	"github.com/influxdata/flux/csv"
 	"github.com/influxdata/flux/lang"
 	"github.com/influxdata/flux/parser"
-	platform "github.com/influxdata/influxdb"
+	"github.com/influxdata/influxdb"
 	"github.com/influxdata/influxdb/query"
 	"github.com/influxdata/influxql"
 )
@@ -32,7 +32,7 @@ type QueryRequest struct {
 	Type    string       `json:"type"`
 	Dialect QueryDialect `json:"dialect"`
 
-	Org *platform.Organization `json:"-"`
+	Org *influxdb.Organization `json:"-"`
 }
 
 // QueryDialect is the formatting options for the query response.
@@ -69,7 +69,10 @@ func (r QueryRequest) Validate() error {
 	}
 
 	if r.Spec != nil && r.Extern != nil {
-		return errors.New("request body cannot specify both a spec and an external declarations")
+		return &influxdb.Error{
+			Code: influxdb.EInvalid,
+			Msg:  "request body cannot specify both a spec and external declarations",
+		}
 	}
 
 	if r.Type != "flux" {
@@ -224,21 +227,23 @@ func (r QueryRequest) proxyRequest(now func() time.Time) (*query.ProxyRequest, e
 		if err != nil {
 			return nil, err
 		}
-		if r.Extern != nil {
-			pkg.Files = append([]*ast.File{r.Extern}, pkg.Files...)
-		}
-		compiler = lang.ASTCompiler{
+		c := lang.ASTCompiler{
 			AST: pkg,
 			Now: now,
 		}
-	} else if r.AST != nil {
 		if r.Extern != nil {
-			r.AST.Files = append([]*ast.File{r.Extern}, r.AST.Files...)
+			c.PrependFile(r.Extern)
 		}
-		compiler = lang.ASTCompiler{
+		compiler = c
+	} else if r.AST != nil {
+		c := lang.ASTCompiler{
 			AST: r.AST,
 			Now: now,
 		}
+		if r.Extern != nil {
+			c.PrependFile(r.Extern)
+		}
+		compiler = c
 	} else if r.Spec != nil {
 		compiler = lang.SpecCompiler{
 			Spec: r.Spec,
@@ -301,7 +306,7 @@ func QueryRequestFromProxyRequest(req *query.ProxyRequest) (*QueryRequest, error
 	return qr, nil
 }
 
-func decodeQueryRequest(ctx context.Context, r *http.Request, svc platform.OrganizationService) (*QueryRequest, error) {
+func decodeQueryRequest(ctx context.Context, r *http.Request, svc influxdb.OrganizationService) (*QueryRequest, error) {
 	var req QueryRequest
 
 	var contentType = "application/json"
@@ -336,7 +341,7 @@ func decodeQueryRequest(ctx context.Context, r *http.Request, svc platform.Organ
 	return &req, err
 }
 
-func decodeProxyQueryRequest(ctx context.Context, r *http.Request, auth platform.Authorizer, svc platform.OrganizationService) (*query.ProxyRequest, error) {
+func decodeProxyQueryRequest(ctx context.Context, r *http.Request, auth influxdb.Authorizer, svc influxdb.OrganizationService) (*query.ProxyRequest, error) {
 	req, err := decodeQueryRequest(ctx, r, svc)
 	if err != nil {
 		return nil, err
@@ -347,10 +352,10 @@ func decodeProxyQueryRequest(ctx context.Context, r *http.Request, auth platform
 		return nil, err
 	}
 
-	a, ok := auth.(*platform.Authorization)
+	a, ok := auth.(*influxdb.Authorization)
 	if !ok {
-		// TODO(desa): this should go away once we're using platform.Authorizers everywhere.
-		return pr, platform.ErrAuthorizerNotSupported
+		// TODO(desa): this should go away once we're using influxdb.Authorizers everywhere.
+		return pr, influxdb.ErrAuthorizerNotSupported
 	}
 
 	pr.Request.Authorization = a

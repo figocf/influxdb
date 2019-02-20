@@ -109,7 +109,7 @@ func TestQueryRequest_Validate(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "no extern with spec",
+			name: "query cannot have both extern and spec",
 			fields: fields{
 				Extern: &ast.File{},
 				Spec:   &flux.Spec{},
@@ -558,7 +558,7 @@ func Test_decodeProxyQueryRequest(t *testing.T) {
 			},
 		},
 		{
-			name: "valid post query request",
+			name: "valid query including extern definition",
 			args: args{
 				r: httptest.NewRequest("POST", "/", bytes.NewBufferString(`
 {
