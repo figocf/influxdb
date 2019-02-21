@@ -61,6 +61,7 @@ export type Action =
   | SetScraperTargetID
   | ClearDataLoaders
   | SetTelegrafConfigName
+  | SetTelegrafConfigDescription
 
 interface SetDataLoadersType {
   type: 'SET_DATA_LOADERS_TYPE'
@@ -90,6 +91,18 @@ interface SetTelegrafConfigName {
 export const setTelegrafConfigName = (name: string): SetTelegrafConfigName => ({
   type: 'SET_TELEGRAF_CONFIG_NAME',
   payload: {name},
+})
+
+interface SetTelegrafConfigDescription {
+  type: 'SET_TELEGRAF_CONFIG_DESCRIPTION'
+  payload: {description: string}
+}
+
+export const setTelegrafConfigDescription = (
+  description: string
+): SetTelegrafConfigDescription => ({
+  type: 'SET_TELEGRAF_CONFIG_DESCRIPTION',
+  payload: {description},
 })
 
 interface UpdateTelegrafPluginConfig {
